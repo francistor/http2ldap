@@ -70,7 +70,7 @@ app.get('/*', (req, res, next) => {
   if (scopeNumber == "1") scope = "one";  // Find one level children
   if (scopeNumber == "2") scope = "sub";  // Find all subtree
 
-  if(debug) console.log(`search ${searchBase} filter ${filter} scope ${scope}`);
+  if(debug) console.log(`[DEBUG] [${new Date().toISOString()}] search ${searchBase} filter ${filter} scope ${scope}`);
 
   let opts = {
       filter: filter,
@@ -95,7 +95,7 @@ app.get('/*', (req, res, next) => {
         // This is converted to the format needed by ldapjs server API
         // {dn: dn, "attributes": {attriubte name: [values]}}
         // This is easier to parse in the API Gateway
-        if(debug) console.log("unparsed entry:", JSON.stringify(entry.pojo));
+        if(debug) console.log(`[INFO] [${new Date().toISOString()}] unparsed entry: `, JSON.stringify(entry.pojo));
         let resp = {
           dn: entry.pojo.objectName,
           attributes:{}
@@ -104,7 +104,7 @@ app.get('/*', (req, res, next) => {
             resp.attributes[attr.type] = attr.values;
         });
 
-        if(debug) console.log("pushing entry:", JSON.stringify(resp));
+        if(debug) console.log(`[INFO] [${new Date().toISOString()}] pushing entry: `, JSON.stringify(resp));
 
         entries.push(resp);
       });
@@ -112,21 +112,22 @@ app.get('/*', (req, res, next) => {
       // All entries available. Send final response
       ldapRes.on('end', (result) => {
         if(result.status !== 0){
-          next(new Error("ldap status result was: " +  result.status));
+          console.log(`[ERROR] [${new Date().toISOString()}] status: `, result.status);
+          res.status(400).json({message: 'ldap status result was: ' + result.status}).end();
           return;
         }
 
-        if(debug) console.log('entries:', JSON.stringify(entries));
+        if(debug) console.log(`[DEBUG] [${new Date().toISOString()}] entries:`, JSON.stringify(entries));
         res.json(entries);
         next();
       });
 
       ldapRes.on('error', (err) => {
         if (err instanceof ldap.NoSuchObjectError){
-          console.error('not found: ' + searchBase);
+          console.error(`[ERROR] [${new Date().toISOString()}] not found: ` + searchBase);
           res.status(400).json({message: 'not found: ' + searchBase}).end();
         } else {
-          console.error('error: ' + err);
+          console.error(`[ERROR] [${new Date().toISOString()}] error: ` + err);
           res.status(500).json({message: err.message}).end();
         }
         
@@ -135,7 +136,7 @@ app.get('/*', (req, res, next) => {
       // Referals are not suported
       ldapRes.on('searchReference', (referral) => {
         console.log('referral: ' + referral.uris.join());
-        console.error('referrals not supported');
+        console.error(`[ERROR] [${new Date().toISOString()}] referrals not supported`);
         res.status(400);
         res.json({"message": "referrals not supported"});
         res.end();
@@ -145,5 +146,5 @@ app.get('/*', (req, res, next) => {
 
 // Start HTTP server
 app.listen(port, host, () => {
-	console.log(`http server listening on port ${port}`)
+	console.log(`[INFO] [${new Date().toISOString()}] http server listening on port ${port}`)
 });
